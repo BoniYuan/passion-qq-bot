@@ -1,0 +1,52 @@
+name: sub2-qqbot
+
+services:
+  astrbot:
+    image: m.daocloud.io/docker.io/soulter/astrbot:latest
+    container_name: sub2-astrbot
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -c
+      - pip install --no-cache-dir "cryptography>=42.0.0" && python main.py
+    ports:
+      - "6185:6185"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    dns:
+      - 223.5.5.5
+      - 1.1.1.1
+    volumes:
+      - ./data:/AstrBot/data
+      - ./plugins/astrbot_plugin_sub2:/AstrBot/data/plugins/astrbot_plugin_sub2
+      - ./plugins/astrbot_plugin_passion_admin:/AstrBot/data/plugins/astrbot_plugin_passion_admin
+      - ./plugins/astrbot_plugin_passion_faq:/AstrBot/data/plugins/astrbot_plugin_passion_faq:ro
+    networks:
+      - bot-network
+
+  napcat:
+    image: m.daocloud.io/docker.io/mlikiowa/napcat-docker:latest
+    container_name: sub2-napcat
+    profiles: ["qq"]
+    restart: unless-stopped
+    ports:
+      - "6099:6099"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      NAPCAT_UID: ${NAPCAT_UID:-1000}
+      NAPCAT_GID: ${NAPCAT_GID:-1000}
+      MODE: astrbot
+      WEBUI_TOKEN: ${NAPCAT_WEBUI_TOKEN:-change-me}
+    dns:
+      - 223.5.5.5
+      - 1.1.1.1
+    volumes:
+      - ./data:/AstrBot/data
+      - ./napcat/config:/app/napcat/config
+      - ./napcat/qq:/app/.config/QQ
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge

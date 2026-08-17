@@ -1,0 +1,48 @@
+{
+  "base_url": {
+    "description": "Passion API 地址",
+    "type": "string",
+    "default": "https://api.passionapi.com"
+  },
+  "admin_qq_ids": {
+    "description": "允许充值和退款的 QQ 号，多个号码用英文逗号分隔",
+    "type": "string",
+    "default": "610706314"
+  },
+  "admin_email": {
+    "description": "Passion API 管理员登录邮箱",
+    "type": "string",
+    "default": "610706314@qq.com"
+  },
+  "admin_password": {
+    "description": "Passion API 管理员登录密码，仅保存在本机 AstrBot 配置中",
+    "type": "string",
+    "default": "",
+    "obvious_hint": false
+  },
+  "default_amount": {
+    "description": "直接粘贴顾客消息时的默认充值金额（美元）",
+    "type": "float",
+    "default": 15.0
+  },
+  "default_notes": {
+    "description": "直接粘贴顾客消息时的默认备注",
+    "type": "string",
+    "default": "测试额度-15刀"
+  },
+  "max_code_count": {
+    "description": "单次最多生成的兑换码数量",
+    "type": "int",
+    "default": 20
+  },
+  "max_amount": {
+    "description": "单笔充值或退款金额上限（美元）",
+    "type": "float",
+    "default": 1000.0
+  },
+  "request_timeout": {
+    "description": "API 请求超时秒数",
+    "type": "int",
+    "default": 15
+  }
+}

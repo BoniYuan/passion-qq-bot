@@ -1,0 +1,6 @@
+name: astrbot_plugin_identity_reply
+display_name: 群成员昵称识别
+desc: 按 QQ 号区分成员，默认读取当前 QQ 昵称，仅在明确要求时更新个人称呼。
+version: 0.2.0
+author: local
+repo: https://github.com/your-org/astrbot_plugin_identity_reply

@@ -1,0 +1,12 @@
+.env
+setup-secrets.txt
+.ssh-passion/
+data/
+napcat/
+work/
+tools/sub2api-source/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.zip
+QQ登录二维码*.png

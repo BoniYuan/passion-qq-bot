@@ -1,0 +1,86 @@
+{
+  "base_url": {
+    "description": "sub2 根地址，例如 https://api.example.com",
+    "type": "string",
+    "default": ""
+  },
+  "encryption_key": {
+    "description": "Fernet 主密钥。使用 tools/generate_key.py 生成；设置后不要更换，否则已有绑定无法解密",
+    "type": "string",
+    "default": "",
+    "obvious_hint": false
+  },
+  "auth_mode": {
+    "description": "令牌传递方式",
+    "type": "string",
+    "options": ["bearer", "header", "cookie"],
+    "default": "bearer"
+  },
+  "auth_name": {
+    "description": "header 模式的请求头名称，或 cookie 模式的 Cookie 名称",
+    "type": "string",
+    "default": "Authorization"
+  },
+  "checkin_endpoint": {
+    "description": "签到 API 路径",
+    "type": "string",
+    "default": "/api/user/checkin"
+  },
+  "checkin_method": {
+    "description": "签到请求方法",
+    "type": "string",
+    "options": ["POST", "GET"],
+    "default": "POST"
+  },
+  "balance_endpoint": {
+    "description": "用户信息或余额 API 路径",
+    "type": "string",
+    "default": "/api/user/self"
+  },
+  "balance_method": {
+    "description": "余额请求方法",
+    "type": "string",
+    "options": ["GET", "POST"],
+    "default": "GET"
+  },
+  "success_path": {
+    "description": "成功标记的 JSON 路径；为空表示 HTTP 2xx 即成功",
+    "type": "string",
+    "default": "success"
+  },
+  "message_path": {
+    "description": "提示消息的 JSON 路径",
+    "type": "string",
+    "default": "message"
+  },
+  "balance_total_path": {
+    "description": "总额度 JSON 路径",
+    "type": "string",
+    "default": "data.quota"
+  },
+  "balance_used_path": {
+    "description": "已使用额度 JSON 路径；没有该字段可留空",
+    "type": "string",
+    "default": "data.used_quota"
+  },
+  "balance_remaining_path": {
+    "description": "剩余额度 JSON 路径；没有时由总额减已用额度",
+    "type": "string",
+    "default": ""
+  },
+  "quota_divisor": {
+    "description": "面板内部额度换算除数；原值就是人民币时填 1",
+    "type": "float",
+    "default": 500000.0
+  },
+  "currency": {
+    "description": "显示币种",
+    "type": "string",
+    "default": "CNY"
+  },
+  "request_timeout": {
+    "description": "API 请求超时秒数",
+    "type": "int",
+    "default": 15
+  }
+}

@@ -1,0 +1,6 @@
+name: astrbot_plugin_passion_faq
+display_name: Passion 客户 FAQ 固定回复
+desc: 明确命中客户常见问题时直接返回固定模板并停止大模型，未命中时继续交给原生知识库和大模型。
+version: 0.3.1
+author: local
+repo: https://github.com/your-org/astrbot_plugin_passion_faq

@@ -1,0 +1,6 @@
+name: astrbot_plugin_sub2
+display_name: Sub2 中转站助手
+desc: 为 QQ 用户提供 sub2 账号绑定、签到和额度查询。
+version: 0.1.0
+author: local
+repo: https://github.com/your-org/astrbot_plugin_sub2
