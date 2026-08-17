@@ -5,6 +5,90 @@
     "answer": "先在支持 OpenAI 兼容接口的客户端中填写本站 API 地址、你自己的 API Key 和模型名称。不同客户端的字段可能不同；如果配置后报错，把客户端名称和完整错误截图发给我，我帮你定位。不要在群里发送完整 API Key。"
   },
   {
+    "id": "register_account",
+    "semantic_examples": ["PassionAPI 新用户在哪里注册", "第一次使用要怎么创建账号", "注册页面地址是什么", "邮箱和密码在哪里填写"],
+    "triggers": ["怎么注册", "如何注册", "注册账号", "注册网址", "注册页面"],
+    "keyword_groups": [["PassionAPI", "注册"], ["邮箱", "密码", "注册"]],
+    "answer": "访问 https://api.passionapi.com/register，使用邮箱和密码完成注册。请使用自己能正常接收邮件的邮箱，并且不要在群聊中发送密码。"
+  },
+  {
+    "id": "purchase_and_redeem",
+    "semantic_examples": ["卡网买完额度后怎么充进账户", "支付成功收到兑换码以后做什么", "游客购买余额需要填写什么", "购买额度的完整流程是什么"],
+    "triggers": ["怎么充值", "如何充值", "卡网怎么充值", "卡网如何充值", "卡网充值", "怎么买额度", "如何购买额度", "卡网充值余额", "支付后怎么兑换", "购买后怎么兑换", "收到兑换码怎么办", "拿到兑换码", "收到兑换码"],
+    "keyword_groups": [["卡网", "充值"], ["卡网", "兑换码"], ["支付", "兑换码"], ["支付成功", "兑换"], ["游客购买", "邮箱"]],
+    "answer": "在站内侧边栏进入“充值卡网”，选择额度后点击“立即购买 → 游客购买”，填写可正常使用的邮箱并完成支付。支付成功后会获得兑换码，再回到站内“兑换”页面兑换为账户余额。兑换码属于敏感信息，不要发到公开群聊。"
+  },
+  {
+    "id": "create_api_key",
+    "semantic_examples": ["后台怎么生成 API 密钥", "创建密钥时分组怎么选择", "sk 开头的 Key 在哪里复制", "怎么新建一个接口密钥"],
+    "triggers": ["怎么创建密钥", "如何创建密钥", "生成API密钥", "创建API Key", "API密钥在哪里", "sk-xxxx"],
+    "keyword_groups": [["创建密钥", "分组"], ["API", "密钥", "复制"], ["Key", "分组"]],
+    "answer": "在站内“API 密钥”页面点击“创建密钥”，选择普通分组或自定义分组后创建，再点击复制按钮使用。普通分组对应单一分组；自定义分组可以组合不同分组的模型。密钥通常以 sk- 开头，请勿把完整密钥发到群里或截图公开。"
+  },
+  {
+    "id": "custom_model_group",
+    "semantic_examples": ["能不能把常用模型放进同一个 Key", "不同分组的模型怎么合并使用", "自定义分组里模型重名怎么办", "不想来回切换分组密钥"],
+    "triggers": ["自定义分组", "新建自定义分组", "模型放到一个分组", "合并模型分组", "模型重命名"],
+    "keyword_groups": [["不同分组", "模型", "一起"], ["不同分组", "常用模型"], ["常用模型", "一个分组"], ["同一个", "key", "模型"], ["模型名称相同", "重命名"]],
+    "answer": "可以。在“API 密钥管理”右上角新建自定义分组，然后在编辑页面选择需要的不同分组模型。若不同来源的模型名称相同，需要先重命名，才能准确路由到对应模型。创建密钥时选择这个自定义分组即可，具体可选模型以后台当前上架内容为准。"
+  },
+  {
+    "id": "api_endpoint",
+    "semantic_examples": ["PassionAPI 的 base URL 应该填什么", "普通接口和 direct 端点有什么区别", "生图时间很长应该用哪个地址", "为什么有的软件不能带 v1"],
+    "triggers": ["API地址是什么", "API地址", "接口地址是什么", "接口地址", "url端点地址", "端点地址", "API端点", "base url", "base_url", "direct.passionapi.com", "api.passionapi.com/v1", "要不要加v1", "去除/v1", "生图很慢", "长时间生图"],
+    "keyword_groups": [["URL", "v1"], ["端点", "v1"], ["生图", "URL"], ["生图", "地址"], ["生图", "direct"], ["无cf", "地址"]],
+    "answer": "常规端点填写 https://api.passionapi.com/v1；长时间生图等场景可以使用无 CF 端点 https://direct.passionapi.com/v1。部分客户端要求填写不带 /v1 的基础地址，应按该客户端的字段说明调整；酒馆的自定义端点通常需要保留 /v1。"
+  },
+  {
+    "id": "sillytavern_basic_config",
+    "semantic_examples": ["酒馆接入 PassionAPI 的基础设置是什么", "SillyTavern 自定义端点需要加 v1 吗", "酒馆提示词后处理应该选什么", "酒馆怎么填 API 地址"],
+    "triggers": ["酒馆配置", "酒馆怎么配置", "SillyTavern配置", "酒馆自定义端点", "提示词后处理"],
+    "keyword_groups": [["酒馆", "v1"], ["酒馆", "严格"], ["SillyTavern", "端点"]],
+    "answer": "酒馆使用自定义兼容 OpenAI 的接口时，自定义端点通常填写带 /v1 的地址，并把“提示词后处理”设为“严格”。同时填写自己的 API Key 和后台当前上架的模型名称。配置失败时请提供酒馆版本、相关设置截图和完整报错，并遮住 API Key。"
+  },
+  {
+    "id": "codex_install",
+    "semantic_examples": ["Windows 怎么安装 Codex CLI", "安装 Codex 前 Node 要什么版本", "npm 安装 codex 报执行策略错误", "怎么检查 codex 是否安装成功", "Mac 用 brew 怎么安装 Codex"],
+    "triggers": ["安装Codex", "Codex CLI安装", "codex --version", "npm install -g @openai/codex", "Node 20", "RemoteSigned", "brew install --cask codex"],
+    "keyword_groups": [["Codex", "Node"], ["Codex", "npm"], ["Codex", "PowerShell"], ["Codex", "Homebrew"]],
+    "answer": "安装 Codex CLI 前需要 Node.js 20 或更高版本，可先运行 node --version 检查。Windows、macOS 和 Linux 可运行 npm install -g @openai/codex，之后用 codex --version 验证。Windows 若遇到 PowerShell 执行策略报错，可在确认命令来源可信后，为当前用户设置 RemoteSigned 再重试。macOS 也可以使用 brew install --cask codex。"
+  },
+  {
+    "id": "codex_passion_config",
+    "semantic_examples": ["Codex 怎么配置 PassionAPI", "config.toml 和 auth.json 放在哪里", "Codex 中 base_url 怎么写", "OPENAI_API_KEY 应该填什么", "VS Code Codex 插件怎么接入中转"],
+    "triggers": ["Codex配置Passion", "Codex配置中转", "config.toml", "auth.json", "OPENAI_API_KEY", "wire_api responses", "Codex插件配置"],
+    "keyword_groups": [["Codex", "base_url"], ["Codex", "API_KEY"], ["Codex", "config.toml"], ["Codex", "auth.json"]],
+    "answer": "Codex 的配置目录是 macOS/Linux 的 ~/.codex，或 Windows 的 C:\\Users\\你的用户名\\.codex。config.toml 中把 provider 的 base_url 配为 https://api.passionapi.com/v1，并按所用模型配置 wire_api；auth.json 中将 OPENAI_API_KEY 填为你在后台生成的 sk- 密钥。模型名和其他参数以后台当前上架模型及最新配置指南为准。不要公开 config、auth 文件或完整密钥。"
+  },
+  {
+    "id": "subscription_plan",
+    "semantic_examples": ["日卡周卡月卡和余额有什么区别", "订阅额度是不是每天刷新", "每天稳定使用选订阅还是余额", "订阅为什么比直接买余额便宜"],
+    "triggers": ["关于订阅", "日卡", "周卡", "月卡", "订阅额度", "次日刷新"],
+    "keyword_groups": [["订阅", "每天"], ["订阅", "刷新"], ["订阅", "余额"]],
+    "answer": "日卡、周卡、月卡订阅通常每天提供固定额度，并在次日刷新；相比直接购买余额，一般更适合每天都有稳定用量的用户。具体额度、价格和刷新规则请以站内订阅页面当前显示为准。"
+  },
+  {
+    "id": "claude_backend_400",
+    "semantic_examples": ["Claude 请求失败后台显示 400 怎么排查", "克劳德参数格式错误要怎么调整", "Claude 回复长度超过 64k 会报什么错", "酒馆用 Claude 预填充导致 400", "对话最后是 Assistant 为什么失败"],
+    "triggers": ["克劳德报错400", "Claude报错400", "克劳德后台400", "Claude后台400", "回复长度超过64k"],
+    "keyword_groups": [["Claude", "400"], ["克劳德", "400"], ["小克", "400"]],
+    "answer": "Claude 后台显示 400 通常属于请求参数或消息格式错误，请依次检查：\n1. 回复长度不要超过 64k；\n2. temperature 可先设为 1，惩罚值不高于 0.2；top_p 可按需设为 0 或 0.8-0.9，并避免与 top_k 同时启用，其中一个应为 0；\n3. 酒馆的提示词后处理设为“严格”；\n4. 关闭预设里的继续预填充；\n5. 对话末尾应为 system 或 user，不能是 assistant；\n6. 检查预设底部条目的角色设置；\n7. 仍无法解决时，更换预设或模型后重试。"
+  },
+  {
+    "id": "view_request_error",
+    "semantic_examples": ["在哪里看一条请求的具体报错", "后台错误请求详情怎么打开", "使用记录能不能查看失败原因", "怎么找到接口调用的错误日志"],
+    "triggers": ["查看后台报错", "怎么看后台报错", "错误请求详情", "使用记录报错", "具体报错信息", "失败请求", "请求错误详情"],
+    "keyword_groups": [["使用记录", "错误请求"], ["后台", "报错", "查看"], ["请求", "具体错误"], ["请求", "失败", "哪里"]],
+    "answer": "进入站内“使用记录”，点击对应的“错误请求”，即可查看每一条请求的具体报错信息。反馈问题时请提供模型名称、请求时间和完整错误内容，并隐藏 API Key、Token 等敏感信息。"
+  },
+  {
+    "id": "per_request_vs_usage",
+    "semantic_examples": ["按次分组和按量分组有什么区别", "分组里怎么选择按次计费", "网站支持按调用次数收费吗", "按量计费应该选哪个分组"],
+    "triggers": ["按次和按量", "按次分组", "按量分组", "按次计费", "按量计费"],
+    "keyword_groups": [["分组", "按次"], ["分组", "按量"], ["按次", "按量", "区别"]],
+    "answer": "本站同时支持按次和按量分组。创建或选择分组时，根据分组名称中的“按次”或“按量”标识选择即可；实际价格、模型范围和计费规则以站内当前分组说明为准。"
+  },
+  {
     "id": "available_models",
     "triggers": ["支持哪些模型", "有什么模型", "模型列表", "可用模型"],
     "answer": "可用模型以站内模型广场当前上架内容为准。发送 /监控分组 查看客户可见分组，再发送 /模型状态 分组序号 查看对应模型近期状态。"
@@ -41,8 +125,8 @@
   },
   {
     "id": "recharge",
-    "triggers": ["怎么充值", "如何充值", "测试额度怎么领", "领取测试额度", "怎么退款"],
-    "answer": "充值、退款和测试额度由管理员处理。请按管理员公布的流程提供注册邮箱，不要在群里发送密码、Token、支付信息或完整密钥。"
+    "triggers": ["测试额度怎么领", "领取测试额度", "怎么退款", "如何退款", "退款找谁"],
+    "answer": "退款和测试额度由管理员处理。请按管理员公布的流程提供注册邮箱，不要在群里发送密码、Token、支付信息或完整密钥。"
   },
   {
     "id": "redeem_code",

@@ -46,7 +46,7 @@ ADMIN_COMMAND_RE = re.compile(
 )
 
 
-@register("astrbot_plugin_passion_admin", "local", "Passion 群聊管理助手", "0.7.5")
+@register("astrbot_plugin_passion_admin", "local", "Passion 群聊管理助手", "0.7.8")
 class PassionAdminPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -375,6 +375,29 @@ class PassionAdminPlugin(Star):
             return f"{milliseconds / 1000:.1f}s"
         return f"{milliseconds}ms"
 
+    @staticmethod
+    def _group_success_rate(monitored: list[dict[str, Any]]) -> float | None:
+        successes = 0.0
+        requests_total = 0
+        for item in monitored:
+            metrics = item.get("metrics", {})
+            if not isinstance(metrics, dict):
+                continue
+            try:
+                requests = int(metrics.get("request_count", 0) or 0)
+                rate = float(metrics.get("success_rate", 0) or 0)
+            except (TypeError, ValueError):
+                continue
+            if requests <= 0:
+                continue
+            # The monitor API has used both 0-1 and 0-100 representations.
+            normalized_rate = rate / 100 if rate > 1 else rate
+            successes += requests * max(0.0, min(normalized_rate, 1.0))
+            requests_total += requests
+        if requests_total == 0:
+            return None
+        return successes / requests_total * 100
+
     @filter.command("监控分组")
     async def monitor_groups(self, event: AstrMessageEvent):
         if not self._is_current_instance():
@@ -408,55 +431,20 @@ class PassionAdminPlugin(Star):
             return
         try:
             groups = await self._model_plaza_groups()
-            if not group_name.strip():
-                yield event.plain_result("请先发送 /监控分组，再用 /模型状态 序号 查询。")
-                return
-            group = self._select_visible_group(groups, group_name)
-            if not group:
-                yield event.plain_result("没有找到这个分组，请使用 /监控分组 中的序号。")
-                return
-            monitored = await self._monitor_models(int(group["id"]))
-            listed_models = [
-                item for item in group.get("models", []) if isinstance(item, dict)
-            ]
-            statuses: dict[str, list[str]] = {
-                "critical": [],
-                "warning": [],
-                "healthy": [],
-                "unknown": [],
-                "inactive": [],
-            }
-            for listed in sorted(
-                listed_models, key=lambda item: str(item.get("name", "")).lower()
-            ):
-                name = str(listed.get("name", "未知模型"))
-                platform = str(listed.get("platform", group.get("platform", "")))
-                monitored_item = self._match_monitored_model(monitored, platform, name)
-                key, _ = self._public_monitor_status(monitored_item)
-                statuses[key].append(name)
-            lines = [
-                f"{group.get('name', '未命名')} 模型状态（近90分钟）",
-                f"正常 {len(statuses['healthy'])} | 波动 {len(statuses['warning'])} | "
-                f"异常 {len(statuses['critical'])} | 待确认 {len(statuses['unknown'])} | "
-                f"无调用 {len(statuses['inactive'])}",
-            ]
-            if statuses["critical"]:
-                lines.append("\n异常：\n" + "\n".join(statuses["critical"]))
-            if statuses["warning"]:
-                lines.append("\n波动：\n" + "\n".join(statuses["warning"]))
-            if statuses["unknown"]:
-                lines.append("\n待确认：\n" + "\n".join(statuses["unknown"]))
-            if statuses["healthy"]:
-                lines.append("\n正常：\n" + "、".join(statuses["healthy"]))
-            if statuses["inactive"]:
-                lines.append(
-                    "\n近90分钟无调用（不代表不可用）：\n"
-                    + "、".join(statuses["inactive"])
-                )
-            if statuses["critical"]:
-                lines.append("\n建议暂时避开异常模型，优先选择状态正常的模型。")
-            if not listed_models:
-                lines.append("该分组目前没有上架模型。")
+            selected_groups = groups
+            if group_name.strip():
+                group = self._select_visible_group(groups, group_name)
+                if not group:
+                    yield event.plain_result("没有找到这个分组，请使用 /监控分组 中的序号。")
+                    return
+                selected_groups = [group]
+
+            lines = ["渠道成功率（近90分钟）："]
+            for group in selected_groups:
+                monitored = await self._monitor_models(int(group["id"]))
+                success_rate = self._group_success_rate(monitored)
+                rate_text = "暂无调用数据" if success_rate is None else f"{success_rate:.1f}%"
+                lines.append(f"{group.get('name', '未命名')}：{rate_text}")
             yield event.plain_result("\n".join(lines))
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             logger.warning("model status query failed: %s", type(exc).__name__)
@@ -530,7 +518,7 @@ class PassionAdminPlugin(Star):
             "我可以帮你：\n"
             "1. @我进行日常聊天、API 接入答疑和报错分析\n"
             "2. /监控分组 查看客户可见模型分组\n"
-            "3. /模型状态 分组序号 查看已上架模型状态\n"
+            "3. /模型状态 查看各渠道近90分钟成功率\n"
             "4. 新成员入群时自动发送欢迎语\n"
             "管理员还可以使用充值、退款和兑换码功能。"
         )
@@ -971,7 +959,7 @@ class PassionAdminPlugin(Star):
             "默认金额为 15.00，预览 2 分钟有效，充值和退款支持管理员私聊或群聊。\n"
             "兑换码仅限管理员私聊生成。"
             "\n/监控分组：查看模型监控分组。"
-            "\n/模型状态 <分组序号>：查看已上架模型的简化状态。"
+            "\n/模型状态：查看各渠道近90分钟成功率；也可加分组序号单独查询。"
             "\n/模型状态详情 <分组序号>：管理员查看内部监控指标。"
             "\n/机器人功能：查看群助手功能。"
         )

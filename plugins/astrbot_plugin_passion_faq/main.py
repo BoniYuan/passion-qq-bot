@@ -10,7 +10,7 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
 
-@register("astrbot_plugin_passion_faq", "local", "Passion 客户 FAQ 固定回复", "0.3.1")
+@register("astrbot_plugin_passion_faq", "local", "Passion 客户 FAQ 固定回复", "0.4.6")
 class PassionFaqPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -19,11 +19,43 @@ class PassionFaqPlugin(Star):
         self._entries: list[dict[str, Any]] = []
         self._semantic_vectors: list[tuple[list[float], str, str]] = []
         self._semantic_lock = asyncio.Lock()
+        self._blocked_terms = self._load_blocked_terms()
         self._load_entries()
         try:
             asyncio.get_running_loop().create_task(self._ensure_semantic_vectors())
         except RuntimeError:
             pass
+
+    def _load_blocked_terms(self) -> list[str]:
+        path = Path(__file__).with_name("sensitive_words.json")
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            return [str(item).strip().lower() for item in data if str(item).strip()]
+        except (OSError, json.JSONDecodeError, TypeError):
+            logger.warning("Passion FAQ sensitive word list unavailable")
+            return []
+
+    def _blocked_term(self, text: str) -> str | None:
+        normalized = re.sub(r"\s+", "", text).lower()
+        direct = next((term for term in self._blocked_terms if term in normalized), None)
+        if direct:
+            return direct
+        if re.search(
+            r"(?:叫|喊)(?:我|你)?(?:爸爸|妈妈|爷爷|奶奶|哥哥|姐姐|弟弟|妹妹|主人|老公|老婆|宝贝)",
+            normalized,
+        ):
+            return "称呼调教"
+        return None
+
+    def _block_message(self, event: AstrMessageEvent):
+        result = event.plain_result("这类敏感或高风险内容我不能协助处理。请换成合法、安全的技术问题。")
+        if hasattr(event, "stop_event"):
+            event.stop_event()
+        setter = getattr(event, "set_result", None)
+        if callable(setter):
+            setter(result)
+            return None
+        return result
 
     @staticmethod
     def _normalize(text: str) -> str:
@@ -34,6 +66,15 @@ class PassionFaqPlugin(Star):
     def _is_mentioned_in_group(event: AstrMessageEvent) -> bool:
         if not event.get_group_id():
             return True
+
+        wake_checker = getattr(event, "is_at_or_wake_command", None)
+        if callable(wake_checker):
+            try:
+                if wake_checker():
+                    return True
+            except TypeError:
+                pass
+
         message_obj = getattr(event, "message_obj", None)
         raw = getattr(message_obj, "raw_message", None)
         self_id = getattr(message_obj, "self_id", None)
@@ -41,20 +82,31 @@ class PassionFaqPlugin(Star):
             getter = getattr(event, "get_self_id", None)
             if callable(getter):
                 self_id = getter()
-        if isinstance(raw, list):
-            mentions = [
-                segment for segment in raw
-                if isinstance(segment, dict)
-                and str(segment.get("type", "")).lower() in {"at", "mention"}
-            ]
-            if not mentions:
-                return False
-            if not self_id:
+
+        message_getter = getattr(event, "get_messages", None)
+        if callable(message_getter):
+            for segment in message_getter() or []:
+                if segment.__class__.__name__.lower() not in {"at", "mention"}:
+                    continue
+                target = (
+                    getattr(segment, "qq", None)
+                    or getattr(segment, "target", None)
+                    or getattr(segment, "user_id", None)
+                )
+                if not self_id or str(target) == str(self_id):
+                    return True
+
+        raw_segments = raw if isinstance(raw, list) else []
+        if isinstance(raw, dict):
+            raw_segments = raw.get("message", [])
+        for segment in raw_segments:
+            if not isinstance(segment, dict):
+                continue
+            if str(segment.get("type", "")).lower() not in {"at", "mention"}:
+                continue
+            target = (segment.get("data") or {}).get("qq", "")
+            if not self_id or str(target) == str(self_id):
                 return True
-            return any(
-                str((segment.get("data") or {}).get("qq", "")) == str(self_id)
-                for segment in mentions
-            )
         return False
 
     def _load_entries(self) -> None:
@@ -171,6 +223,11 @@ class PassionFaqPlugin(Star):
         if not text and hasattr(event, "get_message_str"):
             text = str(event.get_message_str() or "").strip()
         if not text or text.startswith(("/", "／")):
+            return
+        if self._blocked_term(text):
+            result = self._block_message(event)
+            if result is not None:
+                yield result
             return
         answer = self._find_answer(text)
         if not answer:
