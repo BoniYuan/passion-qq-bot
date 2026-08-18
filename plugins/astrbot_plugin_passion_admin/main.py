@@ -522,10 +522,14 @@ class PassionAdminPlugin(Star):
         group_id = str(event.get_group_id())
         try:
             while True:
+                # Use AstrBot's event sender so the adapter converts the chain
+                # correctly (including real @ mentions and images).
+                await event.send(self._reminder_chain())
                 await asyncio.sleep(minutes * 60)
-                await event.bot.send_group_message(group_id=group_id, message=self._reminder_chain())
         except asyncio.CancelledError:
             return
+        except Exception:
+            logger.exception("群提醒发送失败，群号=%s", group_id)
 
     @filter.command("设置群提醒")
     async def set_group_reminder(self, event: AstrMessageEvent, minutes: str = ""):
