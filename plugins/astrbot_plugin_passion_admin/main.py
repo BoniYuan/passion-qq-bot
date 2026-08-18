@@ -14,7 +14,7 @@ from urllib.parse import urlencode, urljoin
 import aiohttp
 
 from astrbot.api import AstrBotConfig, logger
-from astrbot.api.event import AstrMessageEvent, filter
+from astrbot.api.event import AstrMessageEvent, MessageChain, filter
 from astrbot.api.star import Context, Star, register
 from astrbot.api.message_components import At, Image, Plain
 
@@ -58,9 +58,12 @@ class PassionAdminPlugin(Star):
         self.monitor_models_cache: dict[int, tuple[float, list[dict[str, Any]]]] = {}
         self.model_plaza_cache: tuple[float, list[dict[str, Any]]] | None = None
         self.group_reminder_tasks: dict[str, asyncio.Task] = {}
+        self.group_reminder_configs: dict[str, dict[str, Any]] = {}
         self.admin_token: str | None = None
         self.data_dir = Path("data/plugin_data/astrbot_plugin_passion_admin")
         self.data_dir.mkdir(parents=True, exist_ok=True)
+        self.group_reminder_path = self.data_dir / "group_reminders.json"
+        self._load_group_reminder_configs()
         self.db_path = self.data_dir / "operations.db"
         self.instance_token = uuid.uuid4().hex
         with sqlite3.connect(self.db_path) as db:
@@ -80,6 +83,7 @@ class PassionAdminPlugin(Star):
                 )
                 """
             )
+
             db.execute(
                 """
                 CREATE TABLE IF NOT EXISTS request_claims (
@@ -110,6 +114,32 @@ class PassionAdminPlugin(Star):
                 """,
                 (self.instance_token,),
             )
+
+    def _load_group_reminder_configs(self) -> None:
+        try:
+            import json
+            data = json.loads(self.group_reminder_path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                self.group_reminder_configs = {str(k): v for k, v in data.items() if isinstance(v, dict) and str(v.get("origin", "")).strip() and int(v.get("seconds", v.get("minutes", 0))) >= 1}
+        except (OSError, ValueError, TypeError):
+            self.group_reminder_configs = {}
+
+    def _save_group_reminder_configs(self) -> None:
+        import json
+        tmp_path = self.group_reminder_path.with_suffix(".tmp")
+        tmp_path.write_text(json.dumps(self.group_reminder_configs, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp_path.replace(self.group_reminder_path)
+
+    async def initialize(self) -> None:
+        for group_id, item in self.group_reminder_configs.items():
+            self.group_reminder_tasks[group_id] = asyncio.create_task(self._group_reminder_loop(str(item["origin"]), int(item.get("seconds", int(item.get("minutes", 0)) ))))
+
+    async def terminate(self) -> None:
+        for task in self.group_reminder_tasks.values():
+            task.cancel()
+        if self.group_reminder_tasks:
+            await asyncio.gather(*self.group_reminder_tasks.values(), return_exceptions=True)
+        self.group_reminder_tasks.clear()
 
     @staticmethod
     def _is_private(event: AstrMessageEvent) -> bool:
@@ -495,6 +525,7 @@ class PassionAdminPlugin(Star):
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def welcome_new_member(self, event: AstrMessageEvent):
+        return  # Welcome messages paused by administrator
         if not self._is_current_instance():
             return
         message_obj = getattr(event, "message_obj", None)
@@ -509,48 +540,56 @@ class PassionAdminPlugin(Star):
             return
         yield event.plain_result("欢迎新朋友加入群聊 👋\n这里可以聊 API 接入、模型选择、报错排查和渠道状态，有问题直接 @我就行。")
 
-    def _reminder_chain(self):
-        return [
-            Plain("进群请先看群公告。\n试吃领取请"), At(qq="610706314"),
-            Plain("，或直接发邮箱。\n充值问题请找群主"), At(qq="610706314"),
-            Plain("。\n遇到报错私信管理时请带上报错截图，方便排查。\n"
-                  "网站 → 使用记录 → 错误请求，截图完整内容：\n"),
-            Image(file="2f3b9a72441f80d08df180abdc5b1933"),
-        ]
+    def _parse_interval(self, value: str) -> int:
+        match = re.fullmatch(r"([0-9]+([.][0-9]+)?)([smh])", value.strip().lower())
+        if not match:
+            return 0
+        amount = float(match.group(1))
+        return max(1, int(amount * {"s": 1, "m": 60, "h": 3600}[match.group(3)]))
 
-    async def _group_reminder_loop(self, event: AstrMessageEvent, minutes: int):
-        group_id = str(event.get_group_id())
+    def _reminder_chain(self):
+        return MessageChain([Plain(chr(10).join(["欢迎加入passion！", "", "❤️试吃领取找@领取试吃找我/发邮箱", "❤️充值及代码问题找群主@充值/代码问题找我", "❤️酒馆/airp/小手机/chatbox问题找@酒馆/小手机/chatbox", "❤️报错可私 @airp相关问题可以找我", "", "❗进群请先看群公告", "", "1️⃣遇到报错私信管理时请带上报错截图，方便排查。", "", "2️⃣截图位置：网站-使用记录-错误请求，请截图完整", "", "3️⃣询问报错问题请私信对应管理～"])), Image(file="/AstrBot/data/plugin_data/astrbot_plugin_passion_admin/reminder.jpg")])
+
+    async def _group_reminder_loop(self, origin: str, seconds: int):
         try:
             while True:
-                # Use AstrBot's event sender so the adapter converts the chain
-                # correctly (including real @ mentions and images).
-                await event.send(self._reminder_chain())
-                await asyncio.sleep(minutes * 60)
+                await self.context.send_message(origin, self._reminder_chain())
+                await asyncio.sleep(seconds)
         except asyncio.CancelledError:
             return
         except Exception:
             logger.exception("群提醒发送失败，群号=%s", group_id)
 
     @filter.command("设置群提醒")
-    async def set_group_reminder(self, event: AstrMessageEvent, minutes: str = ""):
+    async def set_group_reminder(self, event: AstrMessageEvent, interval_text: str = ""):
         if not self._authorized(event) or not event.get_group_id():
             yield event.plain_result("群提醒仅限管理员在群内设置。")
             return
         try:
-            interval = int(minutes)
+            interval = self._parse_interval(interval_text)
         except ValueError:
             interval = 0
         if interval < 1:
-            yield event.plain_result("用法：/设置群提醒 分钟数，例如 /设置群提醒 30")
+            yield event.plain_result("用法：/设置群提醒 时间，例如 /设置群提醒 30s、1m 或 1h")
             return
         group_id = str(event.get_group_id())
+        origin = str(getattr(event, "unified_msg_origin", "") or "").strip()
+        if not origin:
+            yield event.plain_result("无法确定当前群消息来源，请稍后重试。")
+            return
         old = self.group_reminder_tasks.pop(group_id, None)
         if old:
             old.cancel()
-        self.group_reminder_tasks[group_id] = asyncio.create_task(
-            self._group_reminder_loop(event, interval)
-        )
-        yield event.plain_result(f"已设置本群每 {interval} 分钟发送一次提醒。")
+        try:
+            await self.context.send_message(origin, self._reminder_chain())
+        except Exception:
+            logger.exception("群提醒试发失败，群号=%s", group_id)
+            yield event.plain_result("提醒试发失败，未启动定时任务。")
+            return
+        self.group_reminder_configs[group_id] = {"origin": origin, "seconds": interval}
+        self._save_group_reminder_configs()
+        self.group_reminder_tasks[group_id] = asyncio.create_task(self._group_reminder_loop(origin, interval))
+        yield event.plain_result(f"已设置本群每 {interval_text} 发送一次提醒。")
 
     @filter.command("停止群提醒")
     async def stop_group_reminder(self, event: AstrMessageEvent):
@@ -560,9 +599,18 @@ class PassionAdminPlugin(Star):
         task = self.group_reminder_tasks.pop(str(event.get_group_id()), None)
         if task:
             task.cancel()
+            self.group_reminder_configs.pop(str(event.get_group_id()), None)
+            self._save_group_reminder_configs()
             yield event.plain_result("已停止本群定时提醒。")
         else:
             yield event.plain_result("本群当前没有启用定时提醒。")
+
+    @filter.command("管理员帮助")
+    async def admin_help(self, event: AstrMessageEvent):
+        if not self._authorized(event) or not event.get_group_id():
+            yield event.plain_result("管理员帮助仅限管理员在群内使用。")
+            return
+        yield event.plain_result("管理员功能：设置群提醒、停止群提醒、监控分组、模型状态、模型状态详情、机器人功能。")
 
     @filter.command("机器人功能")
     async def bot_features(self, event: AstrMessageEvent):
