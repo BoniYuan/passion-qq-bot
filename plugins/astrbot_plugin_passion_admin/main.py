@@ -16,6 +16,7 @@ import aiohttp
 from astrbot.api import AstrBotConfig, logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
+from astrbot.api.message_components import At, Image, Plain
 
 
 EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -46,7 +47,7 @@ ADMIN_COMMAND_RE = re.compile(
 )
 
 
-@register("astrbot_plugin_passion_admin", "local", "Passion 群聊管理助手", "0.7.8")
+@register("astrbot_plugin_passion_admin", "local", "Passion 群聊管理助手", "0.7.9")
 class PassionAdminPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig):
         super().__init__(context)
@@ -505,9 +506,20 @@ class PassionAdminPlugin(Star):
         self_id = str(raw.get("self_id", "")).strip()
         if not user_id or user_id == self_id:
             return
-        yield event.plain_result(
-            "欢迎新朋友加入群聊 👋\n"
-            "这里可以聊 API 接入、模型选择、报错排查和渠道状态，有问题直接 @我就行。"
+        yield event.chain_result(
+            [
+                Plain("欢迎新朋友加入群聊 👋\n\n"),
+                Plain("进群请先看群公告。\n"),
+                Plain("试吃领取请"),
+                At(qq="610706314"),
+                Plain("，或直接发邮箱。\n"),
+                Plain("充值问题请找群主"),
+                At(qq="610706314"),
+                Plain("。\n"),
+                Plain("遇到报错私信管理时，请带上完整报错截图，方便排查。\n"),
+                Plain("网站 → 使用记录 → 错误请求，点击“错误请求”后截图完整内容：\n"),
+                Image(file="2f3b9a72441f80d08df180abdc5b1933"),
+            ]
         )
 
     @filter.command("机器人功能")
