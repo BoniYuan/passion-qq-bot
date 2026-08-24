@@ -18,3 +18,11 @@ qrcode*.png
 current-qrcode*.png
 napcat-*-qrcode.png
 *qrcode*.png
+# Local screenshots, report snapshots, and tunnel logs.
+all-groups-verification.png
+passion-production-*.png
+passion-report-*.png
+production-group-*.png
+robot-report.png
+report.json
+tools/astrbot-tunnel.log
