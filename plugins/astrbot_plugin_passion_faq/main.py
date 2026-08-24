@@ -290,7 +290,10 @@ class PassionFaqPlugin(Star):
         # QQ/NapCat may add non-breaking/invisible spaces or line breaks around a mention.
         mention_probe = re.sub(r"[\s\u200b-\u200f\u202a-\u202e\ufeff]+", "", text)
         mention_only = mention_probe.casefold() in {"@蛋黄", "＠蛋黄", "@3470541417", "＠3470541417"}
-        if (not text or mention_only) and self.mention_image_path.exists():
+        # Only an explicit mention with no question should receive the helper image.
+        # Empty/private image events can be echoes of our own outgoing media and must
+        # not trigger another reply loop.
+        if mention_only and self.mention_image_path.exists():
             if hasattr(event, "stop_event"):
                 event.stop_event()
             yield event.image_result(str(self.mention_image_path.resolve()))
