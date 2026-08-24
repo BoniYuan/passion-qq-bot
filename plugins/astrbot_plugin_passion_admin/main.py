@@ -42,7 +42,7 @@ MONITORED_GROUP_RULES = (
     ("酒馆按量", "¥2.6-3.2/刀", "awsbcc"),
 )
 ADMIN_COMMAND_RE = re.compile(
-    r"[/／]\s*(?:监控分组|模型监控|模型状态详情|模型状态|查询额度|机器人功能|"
+    r"[/／]\s*(?:监控分组|模型监控|模型状态|查询额度|机器人功能|"
     r"确认操作|充值帮助|兑换码|充值|退款)(?:\s|$)"
 )
 
@@ -505,7 +505,6 @@ class PassionAdminPlugin(Star):
             logger.warning("model monitor image failed: %s", type(exc).__name__)
             yield event.plain_result("模型监控图片获取失败，请稍后重试。")
 
-    @filter.command("模型状态详情")
     async def model_status_detail(self, event: AstrMessageEvent, group_name: str = ""):
         if not self._is_current_instance():
             return
@@ -662,7 +661,7 @@ class PassionAdminPlugin(Star):
         if not self._authorized(event) or not event.get_group_id():
             yield event.plain_result("管理员帮助仅限管理员在群内使用。")
             return
-        yield event.plain_result("管理员功能：设置群提醒、停止群提醒、监控分组、模型状态、模型状态详情、机器人功能。")
+        yield event.plain_result("管理员功能：设置群提醒、停止群提醒、监控分组、模型状态、机器人功能。")
 
     @filter.command("机器人功能")
     async def bot_features(self, event: AstrMessageEvent):
@@ -1114,6 +1113,5 @@ class PassionAdminPlugin(Star):
             "兑换码仅限管理员私聊生成。"
             "\n/监控分组：查看模型监控分组。"
             "\n/模型状态：查看各渠道近90分钟成功率；也可加分组序号单独查询。"
-            "\n/模型状态详情 <分组序号>：管理员查看内部监控指标。"
             "\n/机器人功能：查看群助手功能。"
         )

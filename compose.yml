@@ -45,7 +45,6 @@ services:
       - 1.1.1.1
     volumes:
       - ./data:/AstrBot/data
-      - ./plugins/astrbot_plugin_sub2:/AstrBot/data/plugins/astrbot_plugin_sub2
       - ./plugins/astrbot_plugin_passion_admin:/AstrBot/data/plugins/astrbot_plugin_passion_admin
       - ./plugins/astrbot_plugin_passion_faq:/AstrBot/data/plugins/astrbot_plugin_passion_faq:ro
     networks:
