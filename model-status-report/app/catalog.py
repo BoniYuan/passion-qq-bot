@@ -145,6 +145,14 @@ def _model_card(listed: dict[str, Any], monitored: dict[str, Any] | None, usage:
 def merge_group(group: dict[str, Any], monitored_items: list[dict[str, Any]], usage_stats: dict[str, dict[str, int]] | None = None) -> dict[str, Any]:
     listed = [item for item in group.get("models", []) if isinstance(item, dict) and str(item.get("name", "")).strip()]
     valid_monitored = [item for item in monitored_items if isinstance(item, dict)]
+    if not listed:
+        # When model plaza is disabled, dimensions only contains group
+        # metadata. Derive the model list from channel-monitor-v2/models.
+        listed = [
+            {"name": item.get("model"), "platform": item.get("platform", group.get("platform", ""))}
+            for item in valid_monitored
+            if str(item.get("model", "")).strip()
+        ]
     name_counts = Counter(_normalized_name(item.get("model")) for item in valid_monitored)
     exact: dict[tuple[str, str], dict[str, Any]] = {}
     by_name: dict[str, dict[str, Any]] = {}
