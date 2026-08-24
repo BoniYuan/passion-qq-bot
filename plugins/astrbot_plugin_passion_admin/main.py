@@ -187,6 +187,16 @@ class PassionAdminPlugin(Star):
         sender = str(event.get_sender_id())
         return sender in self._admin_ids() or sender in self._operator_admin_ids()
 
+    @staticmethod
+    def _is_command_event(event: AstrMessageEvent, text: str) -> bool:
+        if re.match(r"^\s*[/／]", text):
+            return True
+        raw = getattr(getattr(event, "message_obj", None), "raw_message", None)
+        if isinstance(raw, list):
+            plain = "".join(str((item.get("data") or {}).get("text", "")) for item in raw if isinstance(item, dict) and item.get("type") == "text")
+            return bool(re.match(r"^\s*[/／]", plain))
+        return False
+
     def _private_authorized(self, event: AstrMessageEvent) -> bool:
         return self._is_private(event) and self._authorized(event)
 
@@ -724,16 +734,22 @@ class PassionAdminPlugin(Star):
 
     @filter.command("用户")
     async def query_user(self, event: AstrMessageEvent, email: str = ""):
+        if hasattr(event, "stop_event"):
+            event.stop_event()
         async for result in self._operator_user_lookup(event, email, False):
             yield result
 
     @filter.command("余额")
     async def query_balance(self, event: AstrMessageEvent, email: str = ""):
+        if hasattr(event, "stop_event"):
+            event.stop_event()
         async for result in self._operator_user_lookup(event, email, True):
             yield result
 
     @filter.command("测试额度")
     async def test_credit(self, event: AstrMessageEvent, email: str = ""):
+        if hasattr(event, "stop_event"):
+            event.stop_event()
         async for result in self._auto_test_credit(event, email):
             yield result
 
@@ -1011,7 +1027,7 @@ class PassionAdminPlugin(Star):
         text = str(getattr(event, "message_str", "") or "").strip()
         if not text and hasattr(event, "get_message_str"):
             text = str(event.get_message_str() or "").strip()
-        if not text or text.startswith(("/", "／")) or ADMIN_COMMAND_RE.search(text):
+        if not text or self._is_command_event(event, text) or ADMIN_COMMAND_RE.search(text):
             return
 
         if text in {"确认", "确定"}:
