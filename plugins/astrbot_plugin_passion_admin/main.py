@@ -487,6 +487,7 @@ class PassionAdminPlugin(Star):
         """Send the report PNG; with a keyword, search groups/models/platforms."""
         if not self._is_current_instance():
             return
+        logger.info("model monitor command received: keyword=%r sender=%s", keyword, event.get_sender_id())
         report_url = str(self.config.get("model_status_report_url", "http://model-status-report:8000")).strip().rstrip("/")
         query = urlencode({"search": keyword.strip()}) if keyword.strip() else ""
         endpoint = f"/api/reports/png?{query}" if query else "/api/reports/png"
