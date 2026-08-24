@@ -548,7 +548,21 @@ class PassionAdminPlugin(Star):
         return max(1, int(amount * {"s": 1, "m": 60, "h": 3600}[match.group(3)]))
 
     def _reminder_chain(self):
-        return MessageChain([Plain(chr(10).join(["欢迎加入passion！", "", "❤️试吃领取找@领取试吃找我/发邮箱", "❤️充值及代码问题找群主@充值/代码问题找我", "❤️酒馆/airp/小手机/chatbox问题找@酒馆/小手机/chatbox", "❤️报错可私 @airp相关问题可以找我", "", "❗进群请先看群公告", "", "1️⃣遇到报错私信管理时请带上报错截图，方便排查。", "", "2️⃣截图位置：网站-使用记录-错误请求，请截图完整", "", "3️⃣询问报错问题请私信对应管理～"])), Image(file="/AstrBot/data/plugin_data/astrbot_plugin_passion_admin/reminder.jpg")])
+        text = "\n".join([
+            "欢迎加入Passion！ 🎉",
+            "",
+            "❤️ 试吃领取找 @领取试吃找我/发邮箱（试吃额度为15刀，折合人民币3元）",
+            "❤️ 充值及代码问题找群主 @充值/代码问题找我",
+            "❤️ 酒馆/Airp/小手机/Chatbox问题找 @水（答疑可私没回就是不在）@酒馆/小手机/chatbox",
+            "❤️ 报错可私 @Airp相关问题可以找我@有问题带日志截图",
+            "",
+            "❗进群请先看群公告",
+            "",
+            "1️⃣ 遇到报错私信管理时请带上报错截图，方便排查。",
+            "2️⃣ 截图位置：网站-使用记录-错误请求，请截图完整",
+            "3️⃣ 询问报错问题请私信对应管理～",
+        ])
+        return MessageChain([Plain(text), Image(file="/AstrBot/data/plugin_data/astrbot_plugin_passion_admin/reminder.jpg")])
 
     async def _group_reminder_loop(self, origin: str, seconds: int):
         try:
