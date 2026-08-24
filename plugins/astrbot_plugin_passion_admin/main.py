@@ -541,7 +541,12 @@ class PassionAdminPlugin(Star):
         yield event.plain_result("欢迎新朋友加入群聊 👋\n这里可以聊 API 接入、模型选择、报错排查和渠道状态，有问题直接 @我就行。")
 
     def _parse_interval(self, value: str) -> int:
-        match = re.fullmatch(r"([0-9]+([.][0-9]+)?)([smh])", value.strip().lower())
+        normalized = value.strip().lower()
+        # A bare number is interpreted as minutes for convenient commands such
+        # as `/设置群提醒 120`; explicit s/m/h suffixes remain supported.
+        if re.fullmatch(r"[0-9]+([.][0-9]+)?", normalized):
+            return max(1, int(float(normalized) * 60))
+        match = re.fullmatch(r"([0-9]+([.][0-9]+)?)([smh])", normalized)
         if not match:
             return 0
         amount = float(match.group(1))
