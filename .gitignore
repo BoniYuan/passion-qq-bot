@@ -8,5 +8,13 @@ tools/sub2api-source/
 __pycache__/
 *.pyc
 .pytest_cache/
+model-status-report/node_modules/
+model-status-report/dist/
+model-status-report/.local-data/
+model-status-report/.venv/
 *.zip
 QQ登录二维码*.png
+qrcode*.png
+current-qrcode*.png
+napcat-*-qrcode.png
+*qrcode*.png

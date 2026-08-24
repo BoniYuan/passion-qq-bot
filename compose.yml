@@ -1,18 +1,45 @@
 name: sub2-qqbot
 
 services:
+  official-bot:
+    build: ./official_bot
+    container_name: passion-official-bot
+    profiles: ["official"]
+    restart: unless-stopped
+    environment:
+      # The official QQ bot is optional. Keep empty defaults so commands for
+      # AstrBot/NapCat still work when official-bot credentials are absent.
+      QQ_OFFICIAL_APP_ID: ${QQ_OFFICIAL_APP_ID:-}
+      QQ_OFFICIAL_APP_SECRET: ${QQ_OFFICIAL_APP_SECRET:-}
+      QQ_OFFICIAL_TEST_GROUP: ${QQ_OFFICIAL_TEST_GROUP:-}
+      QQ_OFFICIAL_ADMIN_IDS: ${QQ_OFFICIAL_ADMIN_IDS:-}
+      QQ_OFFICIAL_LIVE_OPERATIONS: ${QQ_OFFICIAL_LIVE_OPERATIONS:-false}
+      TZ: ${TZ:-Asia/Shanghai}
+    networks:
+      - bot-network
+    volumes:
+      - ./data/config/astrbot_plugin_passion_admin_config.json:/app/admin-config.json:ro
+      - ./data/official_bot:/app/data
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
+
   astrbot:
     image: m.daocloud.io/docker.io/soulter/astrbot:latest
     container_name: sub2-astrbot
     restart: unless-stopped
     command:
-      - /bin/sh
-      - -c
-      - pip install --no-cache-dir "cryptography>=42.0.0" && python main.py
+      - python
+      - main.py
     ports:
       - "6185:6185"
+      - "6199:6199"
     environment:
       TZ: ${TZ:-Asia/Shanghai}
+      FAQ_SERVICE_URL: http://faq-manager:8000
     dns:
       - 223.5.5.5
       - 1.1.1.1
@@ -23,6 +50,21 @@ services:
       - ./plugins/astrbot_plugin_passion_faq:/AstrBot/data/plugins/astrbot_plugin_passion_faq:ro
     networks:
       - bot-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    init: true
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:6185/\", timeout=5)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
 
   napcat:
     image: m.daocloud.io/docker.io/mlikiowa/napcat-docker:latest
@@ -35,6 +77,8 @@ services:
       TZ: ${TZ:-Asia/Shanghai}
       NAPCAT_UID: ${NAPCAT_UID:-1000}
       NAPCAT_GID: ${NAPCAT_GID:-1000}
+      ACCOUNT: ${NAPCAT_ACCOUNT:-3470541417}
+      NAPCAT_QUICK_PASSWORD: ${NAPCAT_QUICK_PASSWORD:-}
       MODE: astrbot
       WEBUI_TOKEN: ${NAPCAT_WEBUI_TOKEN:-change-me}
     dns:
@@ -46,7 +90,86 @@ services:
       - ./napcat/qq:/app/.config/QQ
     networks:
       - bot-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    init: true
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
+
+  ollama:
+    image: m.daocloud.io/docker.io/ollama/ollama:latest
+    container_name: sub2-ollama
+    restart: unless-stopped
+    environment:
+      # Keep the knowledge-base embedder resident to avoid 10s+ CPU cold starts.
+      OLLAMA_KEEP_ALIVE: -1
+      OLLAMA_NUM_PARALLEL: 1
+      OLLAMA_MAX_LOADED_MODELS: 1
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - bot-network
+    init: true
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
+
+  model-status-report:
+    build: ./model-status-report
+    container_name: model-status-report
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6190:8000"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    volumes:
+      - ./data/config/astrbot_plugin_passion_admin_config.json:/app/config-source/passion-admin.json:ro
+    networks:
+      - bot-network
+    init: true
+    stop_grace_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
+
+  faq-manager:
+    build: ./faq-manager
+    container_name: faq-manager
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6191:8000"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      FAQ_MANAGER_PASSWORD: ${FAQ_MANAGER_PASSWORD:-passion-faq-admin}
+    volumes:
+      - ./data/faq-manager:/data
+      - ./plugins/astrbot_plugin_passion_faq/faq.json:/import/faq.json:ro
+    networks:
+      - bot-network
+    init: true
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:8000/health\", timeout=5)' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    logging:
+      driver: json-file
+      options:
+        max-size: 20m
+        max-file: "5"
 
 networks:
   bot-network:
     driver: bridge
+
+volumes:
+  ollama-data:

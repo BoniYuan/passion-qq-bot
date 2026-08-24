@@ -1,7 +1,9 @@
 import asyncio
 import json
+import os
 import re
 import urllib.request
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +17,11 @@ class PassionFaqPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
         self.faq_path = Path(__file__).with_name("faq.json")
+        self.mention_image_path = Path(__file__).with_name("assets") / "mention-empty.jpg"
+        self.cache_path = Path("data/plugin_data/astrbot_plugin_passion_faq/entries-cache.json")
+        self.media_dir = self.cache_path.parent / "media"
+        self.service_url = os.getenv("FAQ_SERVICE_URL", "http://faq-manager:8000").rstrip("/")
+        self._remote_checked_at = 0.0
         self._mtime = -1.0
         self._entries: list[dict[str, Any]] = []
         self._semantic_vectors: list[tuple[list[float], str, str]] = []
@@ -22,9 +29,13 @@ class PassionFaqPlugin(Star):
         self._blocked_terms = self._load_blocked_terms()
         self._load_entries()
         try:
-            asyncio.get_running_loop().create_task(self._ensure_semantic_vectors())
+            asyncio.get_running_loop().create_task(self._startup_sync())
         except RuntimeError:
             pass
+
+    async def _startup_sync(self) -> None:
+        await self._refresh_remote()
+        await self._ensure_semantic_vectors()
 
     def _load_blocked_terms(self) -> list[str]:
         path = Path(__file__).with_name("sensitive_words.json")
@@ -45,10 +56,18 @@ class PassionFaqPlugin(Star):
             normalized,
         ):
             return "称呼调教"
+        if re.search(
+            r"(?:女仆|男仆|仆人|奴仆).{0,8}(?:装|服|服装|制服|扮演|角色扮演|换装)"
+            r"|(?:装|服|服装|制服|扮演|角色扮演|换装).{0,8}(?:女仆|男仆|仆人|奴仆)",
+            normalized,
+        ):
+            return "角色扮演服装"
         return None
 
     def _block_message(self, event: AstrMessageEvent):
-        result = event.plain_result("这类敏感或高风险内容我不能协助处理。请换成合法、安全的技术问题。")
+        result = event.plain_result(
+            "这类话题不在服务范围内。请咨询 API 接入、模型配置、计费或报错问题。"
+        )
         if hasattr(event, "stop_event"):
             event.stop_event()
         setter = getattr(event, "set_result", None)
@@ -111,10 +130,13 @@ class PassionFaqPlugin(Star):
 
     def _load_entries(self) -> None:
         try:
-            mtime = self.faq_path.stat().st_mtime
+            source = self.cache_path if self.cache_path.exists() else self.faq_path
+            mtime = source.stat().st_mtime
             if mtime == self._mtime:
                 return
-            data = json.loads(self.faq_path.read_text(encoding="utf-8"))
+            data = json.loads(source.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                data = data.get("entries", [])
             self._entries = [item for item in data if isinstance(item, dict)]
             self._semantic_vectors = []
             self._mtime = mtime
@@ -122,21 +144,53 @@ class PassionFaqPlugin(Star):
         except (OSError, ValueError, TypeError) as exc:
             logger.error("Failed to load Passion FAQ: %s", type(exc).__name__)
 
-    def _find_answer(self, text: str) -> str | None:
+    def _refresh_remote_sync(self) -> None:
+        request = urllib.request.Request(f"{self.service_url}/api/public/entries", headers={"Accept": "application/json"})
+        with urllib.request.urlopen(request, timeout=8) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+        entries = payload.get("entries", [])
+        if not isinstance(entries, list):
+            raise ValueError("invalid FAQ snapshot")
+        self.cache_path.parent.mkdir(parents=True, exist_ok=True)
+        temp = self.cache_path.with_suffix(".tmp")
+        temp.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        temp.replace(self.cache_path)
+        self._mtime = -1.0
+        self._load_entries()
+
+    async def _refresh_remote(self) -> None:
+        loop = asyncio.get_running_loop()
+        current = loop.time()
+        if current - self._remote_checked_at < 30:
+            return
+        self._remote_checked_at = current
+        try:
+            await asyncio.to_thread(self._refresh_remote_sync)
+        except Exception as exc:
+            logger.warning("FAQ service unavailable; using local cache: %s", type(exc).__name__)
+
+    def _find_answer(self, text: str) -> dict[str, Any] | None:
         self._load_entries()
         normalized = self._normalize(text)
-        best_answer: str | None = None
+        best_entry: dict[str, Any] | None = None
         best_score = 0
         for entry in self._entries:
             answer = str(entry.get("answer", "")).strip()
             if not answer:
                 continue
+            exact_triggers = {
+                self._normalize(str(trigger))
+                for trigger in entry.get("exact_triggers", [])
+                if str(trigger).strip()
+            }
+            if normalized in exact_triggers:
+                return entry
             for trigger in entry.get("triggers", []):
                 needle = self._normalize(str(trigger))
                 score = 1000 + len(needle)
                 if needle and needle in normalized and score > best_score:
                     best_score = score
-                    best_answer = answer
+                    best_entry = entry
             for group in entry.get("keyword_groups", []):
                 needles = [
                     self._normalize(str(keyword))
@@ -148,8 +202,8 @@ class PassionFaqPlugin(Star):
                 score = 500 + sum(len(needle) for needle in needles)
                 if score > best_score:
                     best_score = score
-                    best_answer = answer
-        return best_answer
+                    best_entry = entry
+        return best_entry
 
     @staticmethod
     def _embed_texts(texts: list[str]) -> list[list[float]]:
@@ -191,7 +245,7 @@ class PassionFaqPlugin(Star):
             ]
             logger.info("Passion FAQ semantic index ready: %s samples", len(samples))
 
-    async def _find_semantic_answer(self, text: str) -> str | None:
+    async def _find_semantic_answer(self, text: str) -> dict[str, Any] | None:
         try:
             await self._ensure_semantic_vectors()
             if not self._semantic_vectors:
@@ -206,14 +260,25 @@ class PassionFaqPlugin(Star):
             score = sum(a * b for a, b in zip(query_vector, vector, strict=True))
             if entry_id not in scores_by_id or score > scores_by_id[entry_id][0]:
                 scores_by_id[entry_id] = (score, answer)
-        ranked = sorted(scores_by_id.values(), key=lambda item: item[0], reverse=True)
+        ranked = sorted(scores_by_id.items(), key=lambda item: item[1][0], reverse=True)
         if not ranked:
             return None
-        best_score, best_answer = ranked[0]
-        second_score = ranked[1][0] if len(ranked) > 1 else 0.0
+        best_id, (best_score, _) = ranked[0]
+        second_score = ranked[1][1][0] if len(ranked) > 1 else 0.0
         if best_score < 0.72 or best_score - second_score < 0.035:
             return None
-        return best_answer
+        return next((entry for entry in self._entries if str(entry.get("id", "")) == best_id), None)
+
+    def _download_image_sync(self, url: str) -> Path:
+        absolute = urllib.parse.urljoin(f"{self.service_url}/", url.lstrip("/"))
+        suffix = Path(urllib.parse.urlparse(absolute).path).suffix or ".png"
+        name = f"{abs(hash(absolute))}{suffix}"
+        target = self.media_dir / name
+        if not target.exists():
+            self.media_dir.mkdir(parents=True, exist_ok=True)
+            with urllib.request.urlopen(absolute, timeout=15) as response:
+                target.write_bytes(response.read())
+        return target
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def answer_faq(self, event: AstrMessageEvent):
@@ -222,6 +287,14 @@ class PassionFaqPlugin(Star):
         text = str(getattr(event, "message_str", "") or "").strip()
         if not text and hasattr(event, "get_message_str"):
             text = str(event.get_message_str() or "").strip()
+        # QQ/NapCat may add non-breaking/invisible spaces or line breaks around a mention.
+        mention_probe = re.sub(r"[\s\u200b-\u200f\u202a-\u202e\ufeff]+", "", text)
+        mention_only = mention_probe.casefold() in {"@蛋黄", "＠蛋黄", "@3470541417", "＠3470541417"}
+        if (not text or mention_only) and self.mention_image_path.exists():
+            if hasattr(event, "stop_event"):
+                event.stop_event()
+            yield event.image_result(str(self.mention_image_path.resolve()))
+            return
         if not text or text.startswith(("/", "／")):
             return
         if self._blocked_term(text):
@@ -229,11 +302,21 @@ class PassionFaqPlugin(Star):
             if result is not None:
                 yield result
             return
-        answer = self._find_answer(text)
-        if not answer:
-            answer = await self._find_semantic_answer(text)
-        if not answer:
+        await self._refresh_remote()
+        entry = self._find_answer(text)
+        if not entry:
+            entry = await self._find_semantic_answer(text)
+        if not entry:
             return
         if hasattr(event, "stop_event"):
             event.stop_event()
-        yield event.plain_result(answer)
+        yield event.plain_result(str(entry.get("answer", "")).strip())
+        for image in entry.get("images", [])[:4]:
+            url = str(image.get("url", "")).strip() if isinstance(image, dict) else ""
+            if not url:
+                continue
+            try:
+                image_path = await asyncio.to_thread(self._download_image_sync, url)
+                yield event.image_result(str(image_path.resolve()))
+            except Exception as exc:
+                logger.warning("FAQ image unavailable (%s): %s", url, type(exc).__name__)

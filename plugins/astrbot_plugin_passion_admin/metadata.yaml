@@ -1,6 +1,6 @@
 name: astrbot_plugin_passion_admin
 display_name: Passion 群聊管理助手
 desc: 支持技术答疑、模型监控、新人欢迎和管理员余额操作。
-version: 0.8.0
+version: 0.10.0
 author: local
 repo: https://github.com/your-org/astrbot_plugin_passion_admin

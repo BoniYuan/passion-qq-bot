@@ -26,7 +26,7 @@ def require_ok(response: requests.Response) -> dict:
 
 
 def main() -> None:
-    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+    config = json.loads(CONFIG_PATH.read_text(encoding="utf-8-sig"))
     dashboard = config["dashboard"]
     token = jwt.encode(
         {

@@ -9,6 +9,11 @@
     "type": "string",
     "default": "610706314"
   },
+  "test_credit_admin_qq_ids": {
+    "description": "仅允许领取一次性测试额度的 QQ 号，多个号码用英文逗号分隔；不具备充值、退款和兑换码权限",
+    "type": "string",
+    "default": ""
+  },
   "admin_email": {
     "description": "Passion API 管理员登录邮箱",
     "type": "string",
@@ -44,5 +49,10 @@
     "description": "API 请求超时秒数",
     "type": "int",
     "default": 15
+  },
+  "model_status_report_url": {
+    "description": "模型状态报告服务地址",
+    "type": "string",
+    "default": "http://model-status-report:8000"
   }
 }
