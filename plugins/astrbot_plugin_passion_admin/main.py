@@ -42,7 +42,7 @@ MONITORED_GROUP_RULES = (
     ("酒馆按量", "¥2.6-3.2/刀", "awsbcc"),
 )
 ADMIN_COMMAND_RE = re.compile(
-    r"[/／]\s*(?:监控分组|模型状态详情|模型状态|查询额度|机器人功能|"
+    r"[/／]\s*(?:监控分组|模型监控|模型状态详情|模型状态|查询额度|机器人功能|"
     r"确认操作|充值帮助|兑换码|充值|退款)(?:\s|$)"
 )
 
@@ -481,6 +481,28 @@ class PassionAdminPlugin(Star):
         except (aiohttp.ClientError, TimeoutError, ValueError, KeyError) as exc:
             logger.warning("model status query failed: %s", type(exc).__name__)
             yield event.plain_result(f"模型状态查询失败：{exc}")
+
+    @filter.command("模型监控")
+    async def model_monitor(self, event: AstrMessageEvent, keyword: str = ""):
+        """Send the report PNG; with a keyword, search groups/models/platforms."""
+        if not self._is_current_instance():
+            return
+        report_url = str(self.config.get("model_status_report_url", "http://model-status-report:8000")).strip().rstrip("/")
+        query = urlencode({"search": keyword.strip()}) if keyword.strip() else ""
+        endpoint = f"/api/reports/png?{query}" if query else "/api/reports/png"
+        try:
+            timeout = aiohttp.ClientTimeout(total=90)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(urljoin(report_url + "/", endpoint.lstrip("/"))) as response:
+                    payload = await response.read()
+                    if response.status != 200 or not payload.startswith(b"\x89PNG\r\n\x1a\n"):
+                        raise ValueError(f"HTTP {response.status}")
+            target = self.data_dir / f"model-monitor-{uuid.uuid4().hex}.png"
+            target.write_bytes(payload)
+            yield event.image_result(str(target.resolve()))
+        except Exception as exc:
+            logger.warning("model monitor image failed: %s", type(exc).__name__)
+            yield event.plain_result("模型监控图片获取失败，请稍后重试。")
 
     @filter.command("模型状态详情")
     async def model_status_detail(self, event: AstrMessageEvent, group_name: str = ""):
