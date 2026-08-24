@@ -4,11 +4,6 @@
     "type": "string",
     "default": "https://api.passionapi.com"
   },
-  "admin_qq_ids": {
-    "description": "兼容旧配置：超级管理员 QQ 号，多个号码用英文逗号分隔",
-    "type": "string",
-    "default": "610706314"
-  },
   "super_admin_qq_ids": {
     "description": "超级管理员 QQ 号，可充值、退款和生成兑换码",
     "type": "string",
@@ -16,11 +11,6 @@
   },
   "operator_admin_qq_ids": {
     "description": "普通管理员 QQ 号，可测试额度、群提醒、用户和余额查询",
-    "type": "string",
-    "default": ""
-  },
-  "test_credit_admin_qq_ids": {
-    "description": "仅允许领取一次性测试额度的 QQ 号，多个号码用英文逗号分隔；不具备充值、退款和兑换码权限",
     "type": "string",
     "default": ""
   },
