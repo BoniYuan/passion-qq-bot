@@ -552,6 +552,16 @@ class PassionAdminPlugin(Star):
         amount = float(match.group(1))
         return max(1, int(amount * {"s": 1, "m": 60, "h": 3600}[match.group(3)]))
 
+    @staticmethod
+    def _interval_label(value: str) -> str:
+        normalized = value.strip().lower()
+        match = re.fullmatch(r"([0-9]+(?:[.][0-9]+)?)([smh])?", normalized)
+        if not match:
+            return value.strip()
+        amount, unit = match.group(1), match.group(2) or "m"
+        labels = {"s": "秒", "m": "分钟", "h": "小时"}
+        return f"{amount}{labels[unit]}"
+
     def _reminder_chain(self):
         text = "\n".join([
             "欢迎加入Passion！ 🎉",
@@ -608,7 +618,7 @@ class PassionAdminPlugin(Star):
         self.group_reminder_configs[group_id] = {"origin": origin, "seconds": interval}
         self._save_group_reminder_configs()
         self.group_reminder_tasks[group_id] = asyncio.create_task(self._group_reminder_loop(origin, interval))
-        yield event.plain_result(f"已设置本群每 {interval_text} 发送一次提醒。")
+        yield event.plain_result(f"已设置本群每 {self._interval_label(interval_text)} 发送一次提醒。")
 
     @filter.command("停止群提醒")
     async def stop_group_reminder(self, event: AstrMessageEvent):
