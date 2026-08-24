@@ -572,8 +572,8 @@ class PassionAdminPlugin(Star):
     async def _group_reminder_loop(self, origin: str, seconds: int):
         try:
             while True:
-                await self.context.send_message(origin, self._reminder_chain())
                 await asyncio.sleep(seconds)
+                await self.context.send_message(origin, self._reminder_chain())
         except asyncio.CancelledError:
             return
         except Exception:
