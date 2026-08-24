@@ -42,7 +42,7 @@ MONITORED_GROUP_RULES = (
     ("酒馆按量", "¥2.6-3.2/刀", "awsbcc"),
 )
 ADMIN_COMMAND_RE = re.compile(
-    r"[/／]\s*(?:监控分组|模型监控|模型状态|用户|余额|测试额度|查询额度|机器人功能|"
+    r"[/／]\s*(?:模型监控|用户|余额|测试额度|查询额度|机器人功能|"
     r"确认操作|充值帮助|兑换码|充值|退款)(?:\s|$)"
 )
 
@@ -448,7 +448,6 @@ class PassionAdminPlugin(Star):
             return None
         return successes / requests_total * 100
 
-    @filter.command("监控分组")
     async def monitor_groups(self, event: AstrMessageEvent):
         if not self._is_current_instance():
             return
@@ -469,7 +468,6 @@ class PassionAdminPlugin(Star):
             logger.warning("monitor group query failed: %s", type(exc).__name__)
             yield event.plain_result(f"模型监控查询失败：{exc}")
 
-    @filter.command("模型状态")
     async def model_status(self, event: AstrMessageEvent, group_name: str = ""):
         if not self._is_current_instance():
             return
@@ -673,7 +671,7 @@ class PassionAdminPlugin(Star):
         if not self._operator_authorized(event) or not event.get_group_id():
             yield event.plain_result("管理员帮助仅限管理员在群内使用。")
             return
-        yield event.plain_result("管理员功能：设置群提醒、停止群提醒、查询用户、查询余额、测试额度、设置群提醒、停止群提醒。")
+        yield event.plain_result("管理员功能：查询用户、查询余额、测试额度、设置群提醒、停止群提醒。")
 
     @filter.command("机器人功能")
     async def bot_features(self, event: AstrMessageEvent):
@@ -682,9 +680,7 @@ class PassionAdminPlugin(Star):
         yield event.plain_result(
             "我可以帮你：\n"
             "1. @我进行日常聊天、API 接入答疑和报错分析\n"
-            "2. /监控分组 查看客户可见模型分组\n"
-            "3. /模型状态 查看各渠道近90分钟成功率\n"
-            "4. 新成员入群时自动发送欢迎语\n"
+            "2. 新成员入群时自动发送欢迎语\n"
             "普通管理员可查询用户、余额、领取测试额度和设置群提醒；超级管理员还可充值、退款和生成兑换码。"
         )
 
@@ -728,7 +724,7 @@ class PassionAdminPlugin(Star):
                 yield event.plain_result(f"余额查询\n邮箱：{email}\n当前余额：${Decimal(str(balance)).quantize(Decimal('0.01')):.2f}")
             else:
                 status = "已注册" if user.get("id") is not None else "未注册"
-                yield event.plain_result(f"用户查询\n邮箱：{email}\n状态：{status}\n用户 ID：{user.get('id', '-')}")
+                yield event.plain_result(f"用户查询\n邮箱：{email}\n状态：{status}")
         except Exception as exc:
             yield event.plain_result(f"查询失败：{exc}")
 
@@ -1163,7 +1159,5 @@ class PassionAdminPlugin(Star):
             "/确认操作 <六位确认码>（兼容旧方式）\n"
             "默认金额为 15.00，预览 2 分钟有效，充值和退款支持管理员私聊或群聊。\n"
             "兑换码仅限管理员私聊生成。"
-            "\n/监控分组：查看模型监控分组。"
-            "\n/模型状态：查看各渠道近90分钟成功率；也可加分组序号单独查询。"
             "\n/机器人功能：查看群助手功能。"
         )
