@@ -226,8 +226,14 @@ async def fetch_group_report(group_id: int | None = None) -> dict[str, Any]:
         if not token:
             raise RuntimeError("Passion login response does not include an access token")
         auth = {"Authorization": f"Bearer {token}"}
-        plaza = _unwrap(await client.get(f"{config['base_url']}/api/v1/model-plaza", headers=auth))
-        raw_groups = plaza.get("groups", []) if isinstance(plaza, dict) else []
+        # Some Passion deployments disable the model plaza. Channel monitor
+        # dimensions still provide the authoritative group list, so treat the
+        # plaza as optional instead of failing the entire report.
+        try:
+            plaza = _unwrap(await client.get(f"{config['base_url']}/api/v1/model-plaza", headers=auth))
+            raw_groups = plaza.get("groups", []) if isinstance(plaza, dict) else []
+        except (httpx.HTTPError, RuntimeError, ValueError, TypeError):
+            raw_groups = []
         groups = [item for item in raw_groups if isinstance(item, dict) and str(item.get("id", "")).isdigit()]
         groups.sort(key=lambda item: str(item.get("name", "")).casefold())
         try:
