@@ -6,6 +6,7 @@ import sqlite3
 import time
 import uuid
 import hashlib
+import json
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
@@ -64,6 +65,8 @@ class PassionAdminPlugin(Star):
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.group_reminder_path = self.data_dir / "group_reminders.json"
         self._load_group_reminder_configs()
+        self.group_welcome_path = self.data_dir / "group_welcome_settings.json"
+        self.group_welcome_settings = self._load_group_welcome_settings()
         self.db_path = self.data_dir / "operations.db"
         self.instance_token = uuid.uuid4().hex
         with sqlite3.connect(self.db_path) as db:
@@ -123,6 +126,21 @@ class PassionAdminPlugin(Star):
                 self.group_reminder_configs = {str(k): v for k, v in data.items() if isinstance(v, dict) and str(v.get("origin", "")).strip() and int(v.get("seconds", v.get("minutes", 0))) >= 1}
         except (OSError, ValueError, TypeError):
             self.group_reminder_configs = {}
+
+    def _load_group_welcome_settings(self) -> dict[str, bool]:
+        try:
+            data = json.loads(self.group_welcome_path.read_text(encoding="utf-8"))
+            return {str(k): v for k, v in data.items() if isinstance(v, bool)} if isinstance(data, dict) else {}
+        except (OSError, ValueError, TypeError):
+            return {}
+
+    def _save_group_welcome_settings(self) -> None:
+        tmp = self.group_welcome_path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(self.group_welcome_settings, ensure_ascii=False, indent=2), encoding="utf-8")
+        tmp.replace(self.group_welcome_path)
+
+    def _welcome_enabled(self, group_id: str) -> bool:
+        return self.group_welcome_settings.get(group_id, True)
 
     def _save_group_reminder_configs(self) -> None:
         import json
@@ -557,7 +575,34 @@ class PassionAdminPlugin(Star):
 
     @filter.event_message_type(filter.EventMessageType.ALL)
     async def welcome_new_member(self, event: AstrMessageEvent):
-        return  # Welcome messages paused by administrator
+        if not self._is_current_instance():
+            return
+        raw = getattr(getattr(event, "message_obj", None), "raw_message", None)
+        if not isinstance(raw, dict) or raw.get("post_type") != "notice" or raw.get("notice_type") != "group_increase":
+            return
+        group_id = str(raw.get("group_id", "")).strip()
+        if not group_id or not self._welcome_enabled(group_id):
+            return
+        yield event.plain_result("欢迎新朋友加入群聊 👋\n这里可以聊 API 接入、模型选择、报错排查和渠道状态，有问题直接 @我就行。")
+
+    async def _set_group_welcome(self, event: AstrMessageEvent, enabled: bool):
+        group_id = str(event.get_group_id() or "").strip()
+        if not self._operator_authorized(event) or not group_id:
+            yield event.plain_result("新人欢迎设置仅限管理员在群内操作。")
+            return
+        self.group_welcome_settings[group_id] = enabled
+        self._save_group_welcome_settings()
+        yield event.plain_result(f"已为本群{'开启' if enabled else '关闭'}新人欢迎语。")
+
+    @filter.command("设置新人欢迎语")
+    async def set_group_welcome(self, event: AstrMessageEvent, value: str = ""):
+        value = value.strip().lower()
+        if value in {"开", "开启", "on", "1"}:
+            async for result in self._set_group_welcome(event, True): yield result
+        elif value in {"关", "关闭", "off", "0"}:
+            async for result in self._set_group_welcome(event, False): yield result
+        else:
+            yield event.plain_result("用法：/设置新人欢迎语 开启 或 /设置新人欢迎语 关闭")
         if not self._is_current_instance():
             return
         message_obj = getattr(event, "message_obj", None)
