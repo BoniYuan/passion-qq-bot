@@ -42,7 +42,7 @@ MONITORED_GROUP_RULES = (
     ("酒馆按量", "¥2.6-3.2/刀", "awsbcc"),
 )
 ADMIN_COMMAND_RE = re.compile(
-    r"[/／]\s*(?:监控分组|模型监控|模型状态|查询额度|机器人功能|"
+    r"[/／]\s*(?:监控分组|模型监控|模型状态|用户|余额|测试额度|查询额度|机器人功能|"
     r"确认操作|充值帮助|兑换码|充值|退款)(?:\s|$)"
 )
 
@@ -173,11 +173,19 @@ class PassionAdminPlugin(Star):
         return False
 
     def _admin_ids(self) -> set[str]:
-        raw = str(self.config.get("admin_qq_ids", "610706314"))
+        raw = str(self.config.get("super_admin_qq_ids", "")).strip() or str(self.config.get("admin_qq_ids", "610706314"))
+        return {item.strip() for item in raw.split(",") if item.strip()}
+
+    def _operator_admin_ids(self) -> set[str]:
+        raw = str(self.config.get("operator_admin_qq_ids", ""))
         return {item.strip() for item in raw.split(",") if item.strip()}
 
     def _authorized(self, event: AstrMessageEvent) -> bool:
         return str(event.get_sender_id()) in self._admin_ids()
+
+    def _operator_authorized(self, event: AstrMessageEvent) -> bool:
+        sender = str(event.get_sender_id())
+        return sender in self._admin_ids() or sender in self._operator_admin_ids()
 
     def _private_authorized(self, event: AstrMessageEvent) -> bool:
         return self._is_private(event) and self._authorized(event)
@@ -434,9 +442,6 @@ class PassionAdminPlugin(Star):
     async def monitor_groups(self, event: AstrMessageEvent):
         if not self._is_current_instance():
             return
-        if not self._authorized(event):
-            yield event.plain_result("模型监控仅限管理员使用。")
-            return
         try:
             groups = await self._model_plaza_groups()
             if not groups:
@@ -457,9 +462,6 @@ class PassionAdminPlugin(Star):
     @filter.command("模型状态")
     async def model_status(self, event: AstrMessageEvent, group_name: str = ""):
         if not self._is_current_instance():
-            return
-        if not self._authorized(event):
-            yield event.plain_result("模型监控仅限管理员使用。")
             return
         try:
             groups = await self._model_plaza_groups()
@@ -613,7 +615,7 @@ class PassionAdminPlugin(Star):
 
     @filter.command("设置群提醒")
     async def set_group_reminder(self, event: AstrMessageEvent, interval_text: str = ""):
-        if not self._authorized(event) or not event.get_group_id():
+        if not self._operator_authorized(event) or not event.get_group_id():
             yield event.plain_result("群提醒仅限管理员在群内设置。")
             return
         try:
@@ -644,7 +646,7 @@ class PassionAdminPlugin(Star):
 
     @filter.command("停止群提醒")
     async def stop_group_reminder(self, event: AstrMessageEvent):
-        if not self._authorized(event) or not event.get_group_id():
+        if not self._operator_authorized(event) or not event.get_group_id():
             yield event.plain_result("群提醒仅限管理员在群内控制。")
             return
         task = self.group_reminder_tasks.pop(str(event.get_group_id()), None)
@@ -658,10 +660,10 @@ class PassionAdminPlugin(Star):
 
     @filter.command("管理员帮助")
     async def admin_help(self, event: AstrMessageEvent):
-        if not self._authorized(event) or not event.get_group_id():
+        if not self._operator_authorized(event) or not event.get_group_id():
             yield event.plain_result("管理员帮助仅限管理员在群内使用。")
             return
-        yield event.plain_result("管理员功能：设置群提醒、停止群提醒、监控分组、模型状态、机器人功能。")
+        yield event.plain_result("管理员功能：设置群提醒、停止群提醒、查询用户、查询余额、测试额度、设置群提醒、停止群提醒。")
 
     @filter.command("机器人功能")
     async def bot_features(self, event: AstrMessageEvent):
@@ -673,7 +675,7 @@ class PassionAdminPlugin(Star):
             "2. /监控分组 查看客户可见模型分组\n"
             "3. /模型状态 查看各渠道近90分钟成功率\n"
             "4. 新成员入群时自动发送欢迎语\n"
-            "管理员还可以使用充值、退款和兑换码功能。"
+            "普通管理员可查询用户、余额、领取测试额度和设置群提醒；超级管理员还可充值、退款和生成兑换码。"
         )
 
     async def _find_user(self, email: str) -> dict[str, Any]:
@@ -701,6 +703,40 @@ class PassionAdminPlugin(Star):
             raise ValueError(f"邮箱精确匹配数量为 {len(matches)}，已停止操作。")
         return matches[0]
 
+    async def _operator_user_lookup(self, event: AstrMessageEvent, email: str, balance_only: bool = False):
+        if not self._operator_authorized(event):
+            yield event.plain_result("无权操作。此功能仅限普通管理员及超级管理员。")
+            return
+        email = email.strip().lower()
+        if not EMAIL_RE.match(email):
+            yield event.plain_result("用法：/余额 <邮箱> 或 /用户 <邮箱>")
+            return
+        try:
+            user = await self._find_user(email)
+            if balance_only:
+                balance = user.get("balance", user.get("quota", 0))
+                yield event.plain_result(f"余额查询\n邮箱：{email}\n当前余额：${Decimal(str(balance)).quantize(Decimal('0.01')):.2f}")
+            else:
+                status = "已注册" if user.get("id") is not None else "未注册"
+                yield event.plain_result(f"用户查询\n邮箱：{email}\n状态：{status}\n用户 ID：{user.get('id', '-')}")
+        except Exception as exc:
+            yield event.plain_result(f"查询失败：{exc}")
+
+    @filter.command("用户")
+    async def query_user(self, event: AstrMessageEvent, email: str = ""):
+        async for result in self._operator_user_lookup(event, email, False):
+            yield result
+
+    @filter.command("余额")
+    async def query_balance(self, event: AstrMessageEvent, email: str = ""):
+        async for result in self._operator_user_lookup(event, email, True):
+            yield result
+
+    @filter.command("测试额度")
+    async def test_credit(self, event: AstrMessageEvent, email: str = ""):
+        async for result in self._auto_test_credit(event, email):
+            yield result
+
     async def _find_test_credit_record(self, user_id: int) -> dict[str, Any] | None:
         page = 1
         while True:
@@ -727,7 +763,7 @@ class PassionAdminPlugin(Star):
     async def _auto_test_credit(self, event: AstrMessageEvent, email: str):
         if not self._is_current_instance():
             return
-        if not self._authorized(event):
+        if not self._operator_authorized(event):
             return
         email = email.strip().lower()
         if not EMAIL_RE.match(email):
@@ -968,9 +1004,9 @@ class PassionAdminPlugin(Star):
         if not self._is_current_instance():
             return
         # 普通群成员必须 @ 机器人；管理员可直接粘贴邮箱执行管理操作。
-        if not self._is_mentioned_in_group(event) and not self._authorized(event):
+        if not self._is_mentioned_in_group(event) and not self._operator_authorized(event):
             return
-        if not self._authorized(event):
+        if not self._operator_authorized(event):
             return
         text = str(getattr(event, "message_str", "") or "").strip()
         if not text and hasattr(event, "get_message_str"):
