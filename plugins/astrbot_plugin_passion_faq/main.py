@@ -203,6 +203,11 @@ class PassionFaqPlugin(Star):
                 if score > best_score:
                     best_score = score
                     best_entry = entry
+        # Keep the common Claude/anti-gravity 500 response deterministic even
+        # when QQ mention formatting or a stale remote FAQ snapshot changes the
+        # exact trigger text.
+        if "500" in normalized and any(term in normalized for term in ("claude", "反重力", "可用账号耗尽", "availableaccountsexhausted")):
+            return next((entry for entry in self._entries if str(entry.get("id", "")) == "accounts_exhausted"), best_entry)
         return best_entry
 
     @staticmethod
