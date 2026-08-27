@@ -13,6 +13,9 @@ model-status-report/dist/
 model-status-report/.local-data/
 model-status-report/.venv/
 *.zip
+*.tar
+*.tar.gz
+*.tgz
 QQ登录二维码*.png
 qrcode*.png
 current-qrcode*.png

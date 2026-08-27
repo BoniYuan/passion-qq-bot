@@ -85,6 +85,29 @@ docker compose restart astrbot
 
 ## 三、接入 QQ
 
+仓库已将 NapCat 完整运行镜像固定到经过验证的 SHA-256 digest。首次部署时 Docker
+会下载同一版本的 NapCat、Linux QQ 和所需运行库，不需要把数百 MB 的第三方二进制
+提交到 Git 仓库：
+
+```powershell
+docker compose --profile qq pull napcat
+docker compose --profile qq up -d napcat
+```
+
+需要在无网络电脑部署时，可在有网络且已安装 Docker 的 Windows 电脑执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\export-napcat-image.ps1
+```
+
+将生成的 `napcat-image-amd64.tar` 单独带到目标电脑，再执行：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\import-napcat-image.ps1 -Archive .\napcat-image-amd64.tar
+```
+
+离线镜像包包含第三方软件且体积较大，不提交 GitHub；QQ 登录缓存同样保持本地私有。
+
 先启动 NapCatQQ：
 
 ```bash
